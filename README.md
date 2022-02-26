@@ -45,18 +45,38 @@ API header:
 ### Add Job
 
 endpoint: /jobs/add/
-body format: "{Axis}({Angle}}, {Axis}({Angle}), ..."
-body format regex: `r"^[XYZ]\(\d{1,3}\)(, [XYZ]\(\d{1,3}\))*$"`
 
-examples:
+body format example:
+
+    {
+      "job": "X(90), Y(180), X(90)",
+      "mode": "verbatim",
+    }
+
+job field format: "{Axis}({Angle}}, {Axis}({Angle}), ..."
+job field regex: `r"^[XYZ]\(\d{1,3}\)(, [XYZ]\(\d{1,3}\))*$"`
+
+example jobs:
 
     "X(90), Y(180), X(90)"
     "X(0)"
     "Z(180), Y(180)"
+
+mode field format: "{mode}"
+mode field options: "verbatim", "simulation", or "echo"
+
+modes:
+
+1. verbatim: Invoke the runtime
+2. simulation: a simulator is used instead of the full hardware connected runtime
+3. echo: the system fakes return codes from the runtime without doing anything else
 
 example request:
 
     curl --location --request POST 'http://localhost:12021/jobs/add/' \
     --header 'api_key: $YboMhcaz7U+3;;M(~t|BX-~ 2kw|ZII2e+s$pw5sBqf$?g]-BYlq.! R/qMR/V=' \
     --header 'Content-Type: text/plain' \
-    --data-raw 'X(0), Y(0), X(0)'
+    --data-raw '{
+      "job": "X(0), Y(0), X(0)",
+      "mode": "verbatim"
+    }'
