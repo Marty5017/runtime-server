@@ -20,6 +20,17 @@ TEST_HEADERS = {
 }
 
 
+TEST_MODES = [
+    "verbatim",
+    "simulation",
+    "echo",
+    "Verbatim",
+    "Simulation",
+    "Echo",
+    "ECHO"
+]
+
+
 class RestRequestTestCase(AioHTTPTestCase):
     """
     This test case handles all REST requests.
@@ -175,9 +186,36 @@ class RestRequestTestCase(AioHTTPTestCase):
                 }
             )
 
-    async def test_jobs_add_invalid_payload(self):
+    async def test_jobs_add_invalid_body_content_type(self):
         """
-        Test a series of requests to /jobs/add/ with invalid bodies
+        Test a request to /jobs/add/ a string as application/text
+        """
+        async with self.client.post(
+            "/jobs/add/",
+            headers=TEST_HEADERS,
+            data="X(0), Y(0), X(0)"
+        ) as resp:
+            self.assertEqual(resp.status, 400)
+            text = await resp.text()
+            self.assertIn("Request body malformed", text)
+
+    async def test_jobs_add_invalid_body_json(self):
+        """
+        Test a request to /jobs/add/ a string as application/json
+        """
+        async with self.client.post(
+            "/jobs/add/",
+            headers=TEST_HEADERS,
+            data="X(0), Y(0), X(0)"
+        ) as resp:
+            self.assertEqual(resp.status, 400)
+            text = await resp.text()
+            self.assertIn("Request body malformed", text)
+
+    async def test_jobs_add_invalid_job_field(self):
+        """
+        Test a series of requests to /jobs/add/ with invalid job fields in
+        their request bodies
         """
         test_inputs = [
             "aX(0), Y(0), X(0)",
@@ -190,11 +228,36 @@ class RestRequestTestCase(AioHTTPTestCase):
             async with self.client.post(
                 "/jobs/add/",
                 headers=TEST_HEADERS,
-                data=test
+                json={
+                    "job": test,
+                    "mode": "echo"
+                }
             ) as resp:
                 self.assertEqual(resp.status, 400)
                 text = await resp.text()
                 self.assertIn("Job string not in the valid format", text)
+
+    async def test_jobs_add_invalid_mode_field(self):
+        """
+        Test a series of requests to /jobs/add/ with invalid mode fields in
+        their request bodies
+        """
+        test_modes = [
+            "",
+            "simulate",
+        ]
+        for mode in test_modes:
+            async with self.client.post(
+                "/jobs/add/",
+                headers=TEST_HEADERS,
+                json={
+                    "job": "X(0), Y(0), X(0)",
+                    "mode": mode
+                }
+            ) as resp:
+                self.assertEqual(resp.status, 400)
+                text = await resp.text()
+                self.assertIn("Invalid Job Mode", text)
 
     async def test_jobs_add_runtime_errors(self):
         """
@@ -211,36 +274,48 @@ class RestRequestTestCase(AioHTTPTestCase):
             ("X(0)", 4),
         ]
         for test in test_inputs:
-            test_error_str = Runtime.decode_error(test[1])
+            for mode in TEST_MODES:
+                test_error_str = Runtime.decode_error(test[1])
+                async with self.client.post(
+                    "/jobs/add/",
+                    headers=TEST_HEADERS,
+                    json={
+                        "job": test[0],
+                        "mode": mode
+                    }
+                ) as resp:
+                    self.assertEqual(resp.status, 201)
+                    data = await resp.json()
+                    self.assertEqual(
+                        data,
+                        {
+                            "runtime_error_code": test[1],
+                            "runtime_error_string": test_error_str,
+                            "mode": mode.lower(),
+                            "job": test[0],
+                        }
+                    )
+
+    async def test_jobs_add_runtime_success(self):
+        """
+        Test requests to /jobs/add/ that return runtime success
+        """
+        for mode in TEST_MODES:
             async with self.client.post(
                 "/jobs/add/",
                 headers=TEST_HEADERS,
-                data=test[0]
+                json={
+                    "job": "X(0), Y(0), X(0)",
+                    "mode": mode
+                }
             ) as resp:
                 self.assertEqual(resp.status, 201)
                 data = await resp.json()
                 self.assertEqual(
                     data,
                     {
-                        "runtime_error_code": test[1],
-                        "runtime_error_string": test_error_str
+                        "status": "job completed successfully",
+                        "mode": mode.lower(),
+                        "job": "X(0), Y(0), X(0)",
                     }
                 )
-
-    async def test_jobs_add_runtime_success(self):
-        """
-        Test a request to /jobs/add/ that returns runtime success
-        """
-        async with self.client.post(
-            "/jobs/add/",
-            headers=TEST_HEADERS,
-            data="X(0), Y(0), X(0)"
-        ) as resp:
-            self.assertEqual(resp.status, 201)
-            data = await resp.json()
-            self.assertEqual(
-                data,
-                {
-                    "status": "job completed successfully"
-                }
-            )

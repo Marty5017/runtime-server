@@ -21,8 +21,21 @@ class Runtime:
     def execute(self, job: str) -> int:
         """
         Executes a job with the runtime
+        Just return the output from echo for debugging
+        """
+        return self.echo(job)
 
-        These test strings and return codes are just for debuggin
+    def simulate(self, job: str) -> int:
+        """
+        Simulates a job on a simulation of the runtime interface
+        Just return the output from echo for debugging
+        """
+        return self.echo(job)
+
+    def echo(self, job: str) -> int:
+        """
+        Return fake retun codes
+        Hard coded for debugging
         """
         if job == "X(0), Y(0), X(0)":
             return 0

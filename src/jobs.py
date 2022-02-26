@@ -5,6 +5,7 @@ Handle all requests to the endpoints under /jobs/
 
 # default modules
 import re
+import json
 
 # installed modules
 from aiohttp import web
@@ -22,9 +23,67 @@ JOB_INPUT_REGEX = re.compile(r"^[XYZ]\(\d{1,3}\)(, [XYZ]\(\d{1,3}\))*$")
 RUNTIME_INSTANCE = Runtime()
 
 
-async def add_job(request):
+async def run_job(job: str, mode: str) -> web.Response:
+    """
+    Run the specified job
+    Returns a response based on the result
+    """
+    if not JOB_INPUT_REGEX.match(job):
+        Logger.log_error("Invalid job string")
+        return web.json_response(
+            status=400,
+            data={
+                "error": "Job string not in the valid format",
+                "expected_format": "{Axis}({Angle}}, {Axis}({Angle}), ... ",
+                "examples": [
+                    "X(90), Y(180), X(90)",
+                    "X(90)",
+                ]
+            }
+        )
+
+    if mode == "verbatim":
+        runtime_result = RUNTIME_INSTANCE.execute(job)
+    elif mode == "simulation":
+        runtime_result = RUNTIME_INSTANCE.simulate(job)
+    elif mode == "echo":
+        runtime_result = RUNTIME_INSTANCE.echo(job)
+    else:
+        Logger.log_error("Invalid job mode selected string")
+        return web.json_response(
+            status=400,
+            data={
+                "error": "Invalid Job Mode",
+                "expected": "verbatim, simulation, or echo",
+            }
+        )
+
+    if runtime_result != 0:
+        runtime_error = Runtime.decode_error(runtime_result)
+        return web.json_response(
+            status=201,
+            data={
+                "runtime_error_code": runtime_result,
+                "runtime_error_string": runtime_error,
+                "mode": mode,
+                "job": job,
+            }
+        )
+
+    return web.json_response(
+        status=201,
+        data={
+            "status": "job completed successfully",
+            "mode": mode,
+            "job": job,
+        }
+    )
+
+
+async def add_job(request: web.Request) -> web.Response:
     """
     Adds a job to the runtime if the request is valid
+    Returns the response that should be returned to the client
     """
     if request.method != "POST":
         Logger.log_error(
@@ -52,43 +111,35 @@ async def add_job(request):
 
     request_body = await request.text()
 
-    if not JOB_INPUT_REGEX.match(request_body):
-        Logger.log_error("Invalid job string")
+    try:
+        request_json = json.loads(request_body)
+    except json.decoder.JSONDecodeError:
+        Logger.log_error(
+            "User tried to add a job with a malformed request body"
+            f" @ {request.path_qs}."
+            f" Request body: {request_body}"
+        )
         return web.json_response(
             status=400,
             data={
-                "error": "Job string not in the valid format",
-                "expected_format": "{Axis}({Angle}}, {Axis}({Angle}), ... ",
-                "examples": [
-                    "X(90), Y(180), X(90)",
-                    "X(90)",
-                ]
+                "error": "Request body malformed",
+                "expected": "application/json",
+                "body": request_body
             }
         )
 
-    runtime_result = RUNTIME_INSTANCE.execute(request_body)
-    if runtime_result != 0:
-        runtime_error = Runtime.decode_error(runtime_result)
-        return web.json_response(
-            status=201,
-            data={
-                "runtime_error_code": runtime_result,
-                "runtime_error_string": runtime_error,
-            }
-        )
+    job_input_str = request_json.get("job", "").upper()
 
-    return web.json_response(
-        status=201,
-        data={
-            "status": "job completed successfully"
-        }
-    )
+    job_mode = request_json.get("mode", "").lower()
+
+    return await run_job(job_input_str, job_mode)
+
 
 ROOT_REGEX = re.compile(r"^\/jobs(\/|\?)$")
 ADD_REGEX = re.compile(r"^\/jobs/add(\/|\?|$)")
 
 
-async def router(request):
+async def router(request: web.Request) -> web.Response:
     """
     Route the job request to the appropriate handler funcion
     """

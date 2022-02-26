@@ -37,7 +37,7 @@ def get_timestamp() -> str:
     return datetime.datetime.utcnow().isoformat()
 
 
-def log_info(message: str):
+def log_info(message: str) -> None:
     """
     General info messages. E.g. Logging all incoming requests
     """
@@ -45,7 +45,7 @@ def log_info(message: str):
     log_message("INFO", timestamp, message, ALL_LOGS)
 
 
-def log_error(message: str):
+def log_error(message: str) -> None:
     """
     General error messages. E.g. Invalid API key
     """
@@ -54,7 +54,7 @@ def log_error(message: str):
     log_message("ERROR", timestamp, message, ERROR_LOGS)
 
 
-def log_exception(message: str, exception: Exception):
+def log_exception(message: str, exception: Exception) -> None:
     """
     Log all exceptions
 
