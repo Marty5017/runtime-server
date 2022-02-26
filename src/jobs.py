@@ -11,6 +11,7 @@ Handle all requests to the endpoints under /jobs/
 # default modules
 import re
 import json
+import time
 import threading
 
 # installed modules
@@ -27,7 +28,9 @@ API_KEY = '$YboMhcaz7U+3;;M(~t|BX-~ 2kw|ZII2e+s$pw5sBqf$?g]-BYlq.! R/qMR/V='
 
 JOB_INPUT_REGEX = re.compile(r"^[XYZ]\(\d{1,3}\)(, [XYZ]\(\d{1,3}\))*$")
 
-RUNTIME_INSTANCE = Runtime()
+RUNTIME_INSTANCES = []
+for i in range(0, 5):
+    RUNTIME_INSTANCES.append(Runtime(i + 1))
 
 
 async def run_job(job: str, mode: str) -> web.Response:
@@ -85,18 +88,45 @@ def job_thread_handler(job_id: int, job: str, mode: str):
     then updates the status of the job in storage
     """
 
-    if mode == "verbatim":
-        runtime_result = RUNTIME_INSTANCE.execute(job)
-    elif mode == "simulation":
-        runtime_result = RUNTIME_INSTANCE.simulate(job)
-    elif mode == "echo":
-        runtime_result = RUNTIME_INSTANCE.echo(job)
+    is_started = False
+    runtime_id = None
+
+    # loop until the job has been started
+    while not is_started:
+        # search for a runtime that is available
+        for instance in RUNTIME_INSTANCES:
+            runtime_id = instance.runtime_id
+            if instance.get_is_available():
+                STORAGE_INSTANCE.update_job(
+                    job_id,
+                    "Started",
+                    runtime_id
+                )
+                if mode == "verbatim":
+                    runtime_result = instance.execute(job)
+                elif mode == "simulation":
+                    runtime_result = instance.simulate(job)
+                elif mode == "echo":
+                    runtime_result = instance.echo(job)
+                if runtime_result < 0:
+                    STORAGE_INSTANCE.update_job(
+                        job_id,
+                        "Retrying"
+                    )
+                else:
+                    is_started = True
+                    break
+
+        # if none of the runtimes are available just sleep before trying again
+        if not is_started:
+            time.sleep(1)
 
     status = "Success" if runtime_result == 0 else "Runtime Error"
 
     STORAGE_INSTANCE.update_job(
         job_id,
         status,
+        runtime_id,
         runtime_result,
         None if runtime_result == 0 else Runtime.decode_error(runtime_result)
     )

@@ -16,11 +16,11 @@ To install all required modules, please run
 These instructions are for an Ubnuntu Linux system, but should work on any
 posix system
 
-run all tests and linting:
+run all tests and linting (testing takes about a minute to complete):
 
     ./scripts/run_tests_and_linting.sh
 
-run all tests:
+run all tests (testing takes about a minute to complete):
 
     ./scripts/test.sh
 
@@ -107,6 +107,19 @@ request method: GET
 This endpoint allows you to retrieve the details of a specific job by id where
 id is an integer.
 On error a 0 is returned
+
+object fields:
+
+    id: job's id in the database
+    job: string used to start the job
+    mode: selected mode for this job ("verbatim", "simulation", or "echo")
+    status: status of the job. Starts at "Starting", can go to "Retrying", ends in either "Success" or "Runtime Error",
+    runtime: id of the runtime that was used for this job. It is None untill the job has started
+    return_code: None untill started, then 0 on success and >0 on error
+    runtime_error: string to describe the runtime error
+    created_time: UTC time when the job was added to the system
+    start_time: UTC time when the job was started on a runtime
+    end_time: UTC time when the job was completed by a runtime
 
 example request:
 

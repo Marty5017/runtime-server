@@ -4,6 +4,8 @@ Handles the storage of application data.
 
 This implementation makes use of a simple SQLite database, but it can easily
 be replaced by a different database without changing this interface
+
+TODO: Replace SQLite with a more performant database
 """
 
 # pylint: disable=broad-except
@@ -57,8 +59,10 @@ class Storage:
             "   job TEXT NOT NULL,"
             "   mode TEXT,"
             "   status TEXT,"
+            "   runtime INTEGER,"
             "   return_code INTEGER,"
             "   runtime_error TEXT,"
+            "   created_time TEXT,"
             "   start_time TEXT,"
             "   end_time TEXT"
             "); "
@@ -82,20 +86,23 @@ class Storage:
         Add a new job to the job table
         """
         try:
-            start_time = datetime.datetime.utcnow().isoformat()
+            created_time = datetime.datetime.utcnow().isoformat()
             if not self.connection:
                 self.connect_to_db()
             self.create_job_table()
 
             sql_insert = (
                 " INSERT INTO"
-                "    jobs (job, mode, status, start_time)"
+                "    jobs (job, mode, status, created_time)"
                 " VALUES"
                 "    (?,?,?,?)"
             )
 
             cursor = self.connection.cursor()
-            cursor.execute(sql_insert, [job, mode, "Started", start_time])
+            cursor.execute(
+                sql_insert,
+                [job, mode, "Scheduled", created_time]
+            )
             self.connection.commit()
             return cursor.lastrowid
 
@@ -108,29 +115,37 @@ class Storage:
         # return 0 on error
         return 0
 
+    # disable this warning because this method will be an exception to the rule
+    # if any other arguments need to be added we'll need to refactor to use
+    # fewer arguments
+    # pylint: disable=too-many-arguments
     def update_job(
         self,
         db_id: int,
         status: str,
-        return_code: int,
-        runtime_error: Union[None, str]
+        runtime: Union[None, int] = None,
+        return_code: Union[None, int] = None,
+        runtime_error: Union[None, str] = None
     ) -> int:
         """
         Update a job from the job table
         """
         try:
-            end_time = datetime.datetime.utcnow().isoformat()
+            timestamp = timestamp = datetime.datetime.utcnow().isoformat()
+
             if not self.connection:
                 self.connect_to_db()
 
+            time_field = 'start_time' if return_code is None else 'end_time'
             sql_update = (
                 " UPDATE"
                 "    jobs"
                 " SET"
                 "    status = ?,"
+                "    runtime = ?,"
                 "    return_code = ?,"
                 "    runtime_error = ?,"
-                "    end_time = ?"
+                f"   {time_field} = ?"
                 " WHERE"
                 "    id = ?"
             )
@@ -138,7 +153,7 @@ class Storage:
             cursor = self.connection.cursor()
             cursor.execute(
                 sql_update,
-                [status, return_code, runtime_error, end_time, db_id]
+                [status, runtime, return_code, runtime_error, timestamp, db_id]
             )
             self.connection.commit()
             return cursor.lastrowid
@@ -181,10 +196,12 @@ class Storage:
                 "job": row[1],
                 "mode": row[2],
                 "status": row[3],
-                "return_code": row[4],
-                "runtime_error": row[5],
-                "start_time": row[6],
-                "end_time": row[7],
+                "runtime": row[4],
+                "return_code": row[5],
+                "runtime_error": row[6],
+                "created_time": row[7],
+                "start_time": row[8],
+                "end_time": row[9],
             }
 
         except Error as err:
@@ -215,6 +232,7 @@ class Storage:
                 "    *"
                 " FROM"
                 "    jobs"
+                " ORDER BY id ASC"
             )
 
             cursor = self.connection.cursor()
@@ -227,10 +245,12 @@ class Storage:
                     "job": row[1],
                     "mode": row[2],
                     "status": row[3],
-                    "return_code": row[4],
-                    "runtime_error": row[5],
-                    "start_time": row[6],
-                    "end_time": row[7],
+                    "runtime": row[4],
+                    "return_code": row[5],
+                    "runtime_error": row[6],
+                    "created_time": row[7],
+                    "start_time": row[8],
+                    "end_time": row[9],
                 })
             return return_list
 
