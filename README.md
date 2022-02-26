@@ -1,4 +1,4 @@
-# OQC Technical Test
+# Technical Test
 
 ## Description
 
@@ -9,12 +9,13 @@ sourced runtime, and returns the response from the runtime
 
 To install all required modules, please run
 
-    pip install -r requirements.txt
+    python3 -m pip install -r requirements.txt
 
 ## Usage
 
 These instructions are for an Ubnuntu Linux system, but should work on any
-posix system
+posix system. You might need to run `chmod +x ./scripts/*` to get the scripts
+to run
 
 run all tests and linting (testing takes about a minute to complete):
 
@@ -114,8 +115,8 @@ object fields:
     job: string used to start the job
     mode: selected mode for this job ("verbatim", "simulation", or "echo")
     status: status of the job. Starts at "Starting", can go to "Retrying", ends in either "Success" or "Runtime Error",
-    runtime: id of the runtime that was used for this job. It is None untill the job has started
-    return_code: None untill started, then 0 on success and >0 on error
+    runtime: id of the runtime that was used for this job. It is None until the job has started
+    return_code: None until started, then 0 on success and >0 on error
     runtime_error: string to describe the runtime error
     created_time: UTC time when the job was added to the system
     start_time: UTC time when the job was started on a runtime
