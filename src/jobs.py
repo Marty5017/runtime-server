@@ -3,9 +3,15 @@
 Handle all requests to the endpoints under /jobs/
 """
 
+# pylint: disable=broad-except
+
+# disable the too-many returns warning because the many returns make sense here
+# pylint: disable=too-many-return-statements
+
 # default modules
 import re
 import json
+import threading
 
 # installed modules
 from aiohttp import web
@@ -13,6 +19,7 @@ from aiohttp import web
 # custom modules
 import logger as Logger
 from runtime import Runtime
+from storage import STORAGE_INSTANCE
 
 # pylint: disable=fixme
 # TODO: this key must be moved to an environment variable
@@ -42,13 +49,7 @@ async def run_job(job: str, mode: str) -> web.Response:
             }
         )
 
-    if mode == "verbatim":
-        runtime_result = RUNTIME_INSTANCE.execute(job)
-    elif mode == "simulation":
-        runtime_result = RUNTIME_INSTANCE.simulate(job)
-    elif mode == "echo":
-        runtime_result = RUNTIME_INSTANCE.echo(job)
-    else:
+    if mode not in ["verbatim", "simulation", "echo"]:
         Logger.log_error("Invalid job mode selected string")
         return web.json_response(
             status=400,
@@ -58,24 +59,97 @@ async def run_job(job: str, mode: str) -> web.Response:
             }
         )
 
-    if runtime_result != 0:
-        runtime_error = Runtime.decode_error(runtime_result)
-        return web.json_response(
-            status=201,
-            data={
-                "runtime_error_code": runtime_result,
-                "runtime_error_string": runtime_error,
-                "mode": mode,
-                "job": job,
-            }
-        )
+    job_id = STORAGE_INSTANCE.add_job(job, mode)
+
+    job_thread = threading.Thread(
+        target=job_thread_handler,
+        daemon=False,
+        args=(job_id, job, mode)
+    )
+    job_thread.start()
 
     return web.json_response(
         status=201,
         data={
-            "status": "job completed successfully",
+            "id": job_id,
             "mode": mode,
             "job": job,
+        }
+    )
+
+
+def job_thread_handler(job_id: int, job: str, mode: str):
+    """
+    This method is intended to run in its own thread.
+    This method starts the job on the runtime, waits for it to complete,
+    then updates the status of the job in storage
+    """
+
+    if mode == "verbatim":
+        runtime_result = RUNTIME_INSTANCE.execute(job)
+    elif mode == "simulation":
+        runtime_result = RUNTIME_INSTANCE.simulate(job)
+    elif mode == "echo":
+        runtime_result = RUNTIME_INSTANCE.echo(job)
+
+    status = "Success" if runtime_result == 0 else "Runtime Error"
+
+    STORAGE_INSTANCE.update_job(
+        job_id,
+        status,
+        runtime_result,
+        None if runtime_result == 0 else Runtime.decode_error(runtime_result)
+    )
+
+
+async def view_job(request: web.Request, job_id: int) -> web.Response:
+    """
+    Retrieves all of the info for the specified job from storage
+    """
+    if request.method != "GET":
+        Logger.log_error(
+            f"User tried to {request.method} to {request.path_qs}. Only POST requests are allowed"
+        )
+        return web.json_response(
+            status=400,
+            data={
+                "error":
+                "Only GET requests are allowed on this route"
+            }
+        )
+
+    job_data = STORAGE_INSTANCE.get_job(job_id)
+
+    return web.json_response(
+        status=200,
+        data=job_data
+    )
+
+
+async def list_jobs(request: web.Request) -> web.Response:
+    """
+    Retrieves all of the jobs from storage
+    TODO: add pagination
+    """
+    if request.method != "GET":
+        Logger.log_error(
+            f"User tried to {request.method} to {request.path_qs}. Only POST requests are allowed"
+        )
+        return web.json_response(
+            status=400,
+            data={
+                "error":
+                "Only GET requests are allowed on this route"
+            }
+        )
+
+    job_rows = STORAGE_INSTANCE.list_jobs()
+
+    return web.json_response(
+        status=200,
+        data={
+            "count": len(job_rows),
+            "rows": job_rows
         }
     )
 
@@ -136,7 +210,9 @@ async def add_job(request: web.Request) -> web.Response:
 
 
 ROOT_REGEX = re.compile(r"^\/jobs(\/|\?)$")
-ADD_REGEX = re.compile(r"^\/jobs/add(\/|\?|$)")
+ADD_REGEX = re.compile(r"^\/jobs/add(\/$|\?|$)")
+LIST_REGEX = re.compile(r"^\/jobs/list(\/$|\?|$)")
+VIEW_REGEX = re.compile(r"^\/jobs/(\d+)(\/$|\?|$)")
 
 
 async def router(request: web.Request) -> web.Response:
@@ -172,6 +248,11 @@ async def router(request: web.Request) -> web.Response:
 
         if ADD_REGEX.match(request_path):
             return await add_job(request)
+        if LIST_REGEX.match(request_path):
+            return await list_jobs(request)
+        view_match = VIEW_REGEX.match(request_path)
+        if view_match:
+            return await view_job(request, view_match.group(1))
 
         return web.json_response(
             status=404,

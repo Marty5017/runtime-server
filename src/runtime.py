@@ -5,8 +5,11 @@ The content of this module can be replaced by any other implementation as long
 as the interface remains constant
 """
 
+import time
 
 # pylint: disable=no-self-use
+
+
 class Runtime:
     """
     This class will hold all properties of the runtime interface
@@ -37,6 +40,7 @@ class Runtime:
         Return fake retun codes
         Hard coded for debugging
         """
+        time.sleep(1)
         if job == "X(0), Y(0), X(0)":
             return 0
         if job == "X(90), Y(0), Z(90)":

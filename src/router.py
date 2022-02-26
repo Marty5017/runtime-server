@@ -4,6 +4,8 @@ This module handles routes all incoming requests to the appropriate modules.
 General responses, like the options header, are also defined here
 """
 
+# pylint: disable=broad-except
+
 # default modules
 import re
 
@@ -89,7 +91,7 @@ async def entry_point(request: web.Request) -> web.Response:
                 data={"error": "external service request timed out"}
             )
 
-        except Exception as exc:  # pylint: disable=broad-except
+        except Exception as exc:
             Logger.log_exception(
                 "Exeption caught in route_request coroutine",
                 exc
@@ -114,7 +116,7 @@ async def entry_point(request: web.Request) -> web.Response:
                 f" request to ({request.path_qs})"
             )
 
-    except Exception as exc:  # pylint: disable=broad-except
+    except Exception as exc:
         Logger.log_exception(
             "Unexpected exeption caught in router",
             exc

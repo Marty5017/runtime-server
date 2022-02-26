@@ -45,6 +45,10 @@ API header:
 ### Add Job
 
 endpoint: /jobs/add/
+request method: POST
+
+This endpoint allows you to load a new job. The endpoint will return immediatly
+with the id of the job, which can then be used to query the status of the job
 
 body format example:
 
@@ -80,3 +84,32 @@ example request:
       "job": "X(0), Y(0), X(0)",
       "mode": "verbatim"
     }'
+
+### List Jobs
+
+endpoint: /jobs/list/
+request method: GET
+
+This endpoint allows you to retrieve a list of all of the jobs on the system.
+TODO: update this endpoint to allow for pagination
+
+example request:
+
+    curl --location --request GET 'http://localhost:12021/jobs/list/' \
+    --header 'api_key: $YboMhcaz7U+3;;M(~t|BX-~ 2kw|ZII2e+s$pw5sBqf$?g]-BYlq.! R/qMR/V=' \
+    --header 'Content-Type: text/plain'
+
+### Get Job
+
+endpoint: /jobs/{id}/
+request method: GET
+
+This endpoint allows you to retrieve the details of a specific job by id where
+id is an integer.
+On error a 0 is returned
+
+example request:
+
+    curl --location --request GET 'http://localhost:12021/jobs/list/' \
+    --header 'api_key: $YboMhcaz7U+3;;M(~t|BX-~ 2kw|ZII2e+s$pw5sBqf$?g]-BYlq.! R/qMR/V=' \
+    --header 'Content-Type: text/plain'
